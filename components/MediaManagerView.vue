@@ -12,8 +12,7 @@
         Back to Divisions
       </button>
       
-      <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ division.category_name }}</h2>
-      <p class="text-sm text-gray-600">{{ event?.competition_name }} - {{ formatDate(event?.start_date) }}</p>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ event?.competition?.name_short }} - {{ division.category_name }}</h2>
     </div>
 
     <!-- Add New Media Section -->
@@ -22,7 +21,6 @@
       
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Media URL (Instagram or YouTube)</label>
           <input
             v-model="newMediaUrl"
             type="text"
@@ -57,84 +55,132 @@
           </button>
         </div>
 
-        <!-- Embed Preview -->
-        <div class="mb-4">
-          <iframe
-            v-if="mediaPreview.type === 'instagram_post' || mediaPreview.type === 'instagram_reel'"
-            :src="`https://www.instagram.com/p/${mediaPreview.identifier}/embed`"
-            class="w-full h-96 border-0"
-            frameborder="0"
-          ></iframe>
-          
-          <iframe
-            v-else-if="mediaPreview.type === 'youtube'"
-            :src="`https://www.youtube.com/embed/${mediaPreview.identifier}`"
-            class="w-full h-96 border-0"
-            frameborder="0"
-            allowfullscreen
-          ></iframe>
-        </div>
+        <!-- Grid Layout: Media on left, Athlete Selection on right -->
+        <div class="grid grid-cols-2 gap-6">
+          <!-- Media Embed on Left -->
+          <div class="flex-shrink-0 max-w-2xl">
+            <!-- Instagram Embed -->
+            <div v-if="mediaPreview.type === 'instagram_post' || mediaPreview.type === 'instagram_reel'" class="bg-white rounded-lg border border-gray-200 p-2 max-h-[800px] overflow-hidden">
+              <blockquote
+                class="instagram-media"
+                :data-instgrm-permalink="`https://www.instagram.com/p/${mediaPreview.identifier}/`"
+                :data-instgrm-version="14"
+                style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:100%; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"
+              ></blockquote>
+            </div>
 
-        <!-- Athlete Selection -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Tag Athletes</label>
-          
-          <!-- Search athletes -->
-          <input
-            v-model="athleteSearch"
-            type="text"
-            placeholder="Search athletes..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500"
-          />
-
-          <!-- Athlete list -->
-          <div class="space-y-2 max-h-64 overflow-y-auto">
-            <label
-              v-for="athlete in filteredAthletes"
-              :key="athlete.id"
-              class="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+            <!-- YouTube Embed -->
+            <div
+              v-if="mediaPreview.type === 'youtube'"
+              class="relative pb-[56.25%] h-0 overflow-hidden rounded-lg bg-gray-100 max-h-[600px]"
             >
-              <input
-                type="checkbox"
-                :checked="selectedAthletes.includes(athlete.id)"
-                @change="toggleAthlete(athlete.id)"
-                class="mr-3 h-5 w-5 text-blue-600 focus:ring-blue-500"
-              />
-              <div class="flex-1">
-                <p class="font-medium text-gray-900">{{ athlete.name }}</p>
-                <p v-if="athlete.nickname" class="text-sm text-gray-600">{{ athlete.nickname }}</p>
-              </div>
-            </label>
+              <iframe
+                :src="`https://www.youtube.com/embed/${mediaPreview.identifier}`"
+                class="absolute top-0 left-0 w-full h-full"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
           </div>
-          
-          <p class="text-sm text-gray-500 mt-2">{{ selectedAthletes.length }} athlete(s) selected</p>
-        </div>
 
-        <!-- Description -->
-        <div class="mt-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
-          <input
-            v-model="mediaPreview.description"
-            type="text"
-            placeholder="e.g., Finals highlights, Backstage moments..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          <!-- Athlete Selection and Description on Right -->
+          <div class="space-y-4">
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
+              <input
+                v-model="mediaPreview.description"
+                type="text"
+                placeholder="e.g., Finals highlights, Backstage moments..."
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-        <!-- Save button -->
-        <button
-          @click="saveMedia"
-          :disabled="saving"
-          class="mt-4 w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
-        >
-          {{ saving ? 'Saving...' : 'Save Media Entry' }}
-        </button>
+            <!-- Athlete Selection -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tag Athletes</label>
+              
+              <!-- Search athletes -->
+              <input
+                v-model="athleteSearch"
+                type="text"
+                placeholder="Search athletes..."
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500"
+              />
+
+              <!-- Athlete list -->
+              <div class="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                <div
+                  v-for="athlete in filteredAthletes"
+                  :key="athlete.id"
+                  @click="toggleAthleteSelection(athlete.id)"
+                  :class="[
+                    'flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100',
+                    selectedAthletes.includes(athlete.id) ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                  ]"
+                >
+                  <span>{{ athlete.name }}</span>
+                  <svg v-if="selectedAthletes.includes(athlete.id)" class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p v-if="filteredAthletes.length === 0" class="text-sm text-gray-500 p-2">No athletes found.</p>
+              </div>
+              
+              <p class="text-sm text-gray-500 mt-2">{{ selectedAthletes.length }} athlete(s) selected</p>
+            </div>
+
+            <!-- Save button -->
+            <button
+              @click="saveMedia"
+              :disabled="!mediaPreview || selectedAthletes.length === 0 || saving"
+              class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+            >
+              {{ saving ? 'Saving...' : 'Save Media Entry' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Existing Media -->
     <div class="bg-white rounded-lg shadow p-6">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">Existing Media</h3>
+      <div class="mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Existing Media</h3>
+        
+        <!-- Filter Tabs -->
+        <div ref="filterTabsRef" class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            @click="mediaFilter = 'division'"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap border-2',
+              mediaFilter === 'division' 
+                ? 'bg-blue-600 text-white shadow-sm border-blue-600' 
+                : getDivisionMediaCount() === 0
+                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-orange-500'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
+            ]"
+          >
+            Division
+          </button>
+          <button
+            v-for="athlete in athletes"
+            :key="athlete.id"
+            @click="mediaFilter = athlete.id"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 border-2',
+              mediaFilter === athlete.id 
+                ? 'bg-blue-600 text-white shadow-sm border-blue-600' 
+                : getAthleteMediaCount(athlete.id) === 0
+                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-orange-500'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
+            ]"
+          >
+            {{ athlete.name }}
+          </button>
+        </div>
+      </div>
       
       <div v-if="loadingMedia" class="text-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -145,11 +191,11 @@
         No media entries yet
       </div>
 
-      <div v-else class="space-y-4">
+      <div v-else :class="mediaFilter === 'division' ? 'space-y-4' : 'grid grid-cols-2 gap-4'" class="overflow-x-auto">
         <div
-          v-for="media in mediaList"
+          v-for="media in filteredMediaList"
           :key="media.id"
-          class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 bg-white"
+          :class="mediaFilter === 'division' ? 'p-4 border border-gray-200 rounded-lg hover:border-blue-300 bg-white' : 'p-4 border border-gray-200 rounded-lg hover:border-blue-300 bg-white'"
         >
           <!-- Header -->
           <div class="flex justify-between items-start mb-3">
@@ -171,12 +217,12 @@
 
           <p v-if="media.description" class="text-sm text-gray-700 mb-3">{{ media.description }}</p>
           
-          <!-- Main Content: Media + Tagged Athletes -->
-          <div class="grid grid-cols-3 gap-4">
-            <!-- Media on the left (2/3 width) -->
-            <div class="col-span-2">
+              <!-- Main Content: Media + Tagged Athletes -->
+              <div :class="mediaFilter === 'division' ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4'">
+                <!-- Media on the left (2/3 width) -->
+                <div>
               <!-- Instagram Embed -->
-              <div v-if="media.type === 'instagram_post' || media.type === 'instagram_reel'" class="bg-white rounded-lg border border-gray-200 p-2">
+              <div v-if="media.type === 'instagram_post' || media.type === 'instagram_reel'" class="bg-white rounded-lg border border-gray-200 p-2 max-w-3xl max-h-[800px] overflow-hidden">
                 <blockquote
                   class="instagram-media"
                   :data-instgrm-permalink="`https://www.instagram.com/p/${media.identifier}/`"
@@ -188,7 +234,8 @@
               <!-- YouTube Embed -->
               <div
                 v-if="media.type === 'youtube'"
-                class="relative pb-[56.25%] h-0 overflow-hidden rounded-lg bg-gray-100"
+                class="relative pb-[56.25%] h-0 overflow-hidden rounded-lg bg-gray-100 max-w-2xl max-h-96"
+                style="max-height: 24rem;"
               >
                 <iframe
                   :src="`https://www.youtube.com/embed/${media.identifier}`"
@@ -200,8 +247,8 @@
               </div>
             </div>
             
-            <!-- Tagged Athletes on the right (1/3 width) -->
-            <div class="col-span-1">
+            <!-- Tagged Athletes on the right (1/3 width) - only show for division filter -->
+            <div v-if="mediaFilter === 'division'" class="col-span-1">
               <div v-if="media.tagged_athletes && media.tagged_athletes.length > 0">
                 <p class="text-sm font-semibold text-gray-800 mb-2">Tagged Athletes</p>
                 <div class="space-y-2">
@@ -240,15 +287,31 @@ const processing = ref(false)
 const saving = ref(false)
 const loadingMedia = ref(false)
 const athleteSearch = ref('')
+const mediaFilter = ref('division')
 
 const mediaPreview = ref(null)
 const selectedAthletes = ref([])
 const athletes = ref([])
 const mediaList = ref([])
+const athleteResults = ref([])
+
+// Smooth scrolling for filter tabs
+const filterTabsRef = ref(null)
+
 
 onMounted(async () => {
   await loadAthletes()
   await loadMedia()
+  
+  // Make filter tabs smoothly scrollable with mouse wheel
+  if (filterTabsRef.value) {
+    filterTabsRef.value.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault()
+        filterTabsRef.value.scrollLeft += e.deltaY
+      }
+    })
+  }
   
   // Load Instagram embed script
   if (!window.instgrm) {
@@ -272,18 +335,29 @@ onUpdated(() => {
 
 async function loadAthletes() {
   try {
-    // Get athletes who competed in this division
+    // Get athletes who competed in this division with their results
     const { data: resultsData, error: resultsError } = await $supabase
       .from('result')
-      .select('athlete_id')
+      .select('id, athlete_id, place')
       .eq('division_id', props.division.id)
       .limit(500)
 
     if (resultsError) throw resultsError
 
+    // Store results for filtering
+    athleteResults.value = resultsData
+
     const athleteIds = [...new Set(resultsData.map(r => r.athlete_id))]
     
     if (athleteIds.length === 0) return
+
+    // Create a map of athlete_id to place
+    const athletePlaceMap = {}
+    resultsData.forEach(r => {
+      if (r.place && !athletePlaceMap[r.athlete_id]) {
+        athletePlaceMap[r.athlete_id] = r.place
+      }
+    })
 
     const { data: athletesData, error: athletesError } = await $supabase
       .from('athlete')
@@ -295,15 +369,22 @@ async function loadAthletes() {
 
     if (athletesError) throw athletesError
 
-    // Sort by person name after fetching
-    athletes.value = athletesData
-      .map(a => ({
-        ...a,
-        name: a.person?.name_short || a.person?.name || 'Unknown',
-        name_long: a.person?.name || a.person?.name_short || 'Unknown',
-        nickname: a.nickname || null
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    // Map athletes with their places and sort
+    const athletesWithPlace = athletesData.map(a => ({
+      ...a,
+      name: a.person?.name_short || a.person?.name || 'Unknown',
+      name_long: a.person?.name || a.person?.name_short || 'Unknown',
+      nickname: a.nickname || null,
+      place: athletePlaceMap[a.id] || 999 // Default to 999 if no place
+    }))
+
+    // Sort by place (lower is better), then by name
+    athletes.value = athletesWithPlace.sort((a, b) => {
+      if (a.place !== b.place) {
+        return a.place - b.place
+      }
+      return a.name.localeCompare(b.name)
+    })
   } catch (err) {
     console.error('Error loading athletes:', err)
   }
@@ -313,6 +394,15 @@ async function loadMedia() {
   try {
     loadingMedia.value = true
     
+    // Get result IDs for this division
+    const { data: divisionResults } = await $supabase
+      .from('result')
+      .select('id')
+      .eq('division_id', props.division.id)
+    
+    const resultIds = divisionResults?.map(r => r.id) || []
+    
+    // Load media: either has division_id OR has result_id for this division
     const { data, error } = await $supabase
       .from('media')
       .select(`
@@ -323,9 +413,10 @@ async function loadMedia() {
             id,
             person:person_id(name, name_short)
           )
-        )
+        ),
+        result:result_id(id, athlete_id, division_id)
       `)
-      .eq('division_id', props.division.id)
+      .or(`division_id.eq.${props.division.id},result_id.in.(${resultIds.join(',')})`)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -373,7 +464,7 @@ function processMediaUrl() {
   alert('Please enter a valid Instagram or YouTube URL')
 }
 
-function toggleAthlete(athleteId) {
+function toggleAthleteSelection(athleteId) {
   const index = selectedAthletes.value.indexOf(athleteId)
   if (index === -1) {
     selectedAthletes.value.push(athleteId)
@@ -462,6 +553,46 @@ const filteredAthletes = computed(() => {
     (a.nickname && a.nickname.toLowerCase().includes(query))
   )
 })
+
+const filteredMediaList = computed(() => {
+  let filtered = []
+  
+  if (mediaFilter.value === 'division') {
+    // Show only media with division_id (not result_id)
+    filtered = mediaList.value.filter(media => !media.result_id)
+  } else {
+    // Show media where result.athlete_id matches this athlete
+    filtered = mediaList.value.filter(media => 
+      media.result && media.result.athlete_id === mediaFilter.value
+    )
+  }
+  
+  // Sort: posts first, then reels, then others, ordered by created_at desc within each group
+  const typeOrder = { instagram_post: 1, instagram_reel: 2, youtube: 3 }
+  
+  return filtered.sort((a, b) => {
+    const aOrder = typeOrder[a.type] || 999
+    const bOrder = typeOrder[b.type] || 999
+    
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder
+    }
+    
+    // Within same type, order by created_at desc
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
+})
+
+function getAthleteMediaCount(athleteId) {
+  return mediaList.value.filter(media => 
+    media.result && media.result.athlete_id === athleteId
+  ).length
+}
+
+function getDivisionMediaCount() {
+  // Count media without result_id (division-level media)
+  return mediaList.value.filter(media => !media.result_id).length
+}
 
 function formatDate(dateString) {
   if (!dateString) return ''
