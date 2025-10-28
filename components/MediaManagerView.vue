@@ -120,7 +120,15 @@
                     selectedAthletes.includes(athlete.id) ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
                   ]"
                 >
-                  <span>{{ athlete.name }}</span>
+                  <div class="flex items-center gap-3">
+                    <img
+                      :src="athlete.image_url"
+                      :alt="athlete.name"
+                      class="w-8 h-8 rounded-full object-cover"
+                      @error="$event.target.src = athlete.image_placeholder"
+                    />
+                    <span>{{ athlete.name }}</span>
+                  </div>
                   <svg v-if="selectedAthletes.includes(athlete.id)" class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
@@ -205,20 +213,60 @@
               </span>
               <span class="text-sm text-gray-600">{{ media.identifier }}</span>
             </div>
-            <button
-              @click="deleteMedia(media.id)"
-              class="text-red-600 hover:text-red-800"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            <div class="flex gap-2">
+              <button
+                v-if="editingMediaId !== media.id"
+                @click="startEditMedia(media)"
+                class="text-blue-600 hover:text-blue-800"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                @click="deleteMedia(media.id)"
+                class="text-red-600 hover:text-red-800"
+                :disabled="editingMediaId === media.id"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <p v-if="media.description" class="text-sm text-gray-700 mb-3">{{ media.description }}</p>
-          
-              <!-- Main Content: Media + Tagged Athletes -->
-              <div :class="mediaFilter === 'division' ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4'">
+          <!-- Description -->
+          <div v-if="editingMediaId === media.id" class="mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <input
+              v-model="editDescription"
+              type="text"
+              placeholder="e.g., Finals highlights, Backstage moments..."
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            
+            <!-- Action Buttons for Athlete View (when editing) -->
+            <div v-if="mediaFilter !== 'division'" class="mt-3 flex gap-2">
+              <button
+                @click="saveEditMedia(media)"
+                :disabled="savingEdit"
+                class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {{ savingEdit ? 'Saving...' : 'Save' }}
+              </button>
+              <button
+                @click="cancelEditMedia"
+                :disabled="savingEdit"
+                class="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          <p v-else-if="media.description" class="text-sm text-gray-700 mb-3">{{ media.description }}</p>
+            
+          <!-- Main Content: Media + Tagged Athletes / Edit Form -->
+          <div :class="mediaFilter === 'division' ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4'">
                 <!-- Media on the left (2/3 width) -->
                 <div>
               <!-- Instagram Embed -->
@@ -247,22 +295,92 @@
               </div>
             </div>
             
-            <!-- Tagged Athletes on the right (1/3 width) - only show for division filter -->
+            <!-- Right Column: Edit Form OR Tagged Athletes -->
             <div v-if="mediaFilter === 'division'" class="col-span-1">
-              <div v-if="media.tagged_athletes && media.tagged_athletes.length > 0">
-                <p class="text-sm font-semibold text-gray-800 mb-2">Tagged Athletes</p>
-                <div class="space-y-2">
-                  <div
-                    v-for="tagged in media.tagged_athletes"
-                    :key="tagged.athlete_id"
-                    class="px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-800"
-                  >
-                    {{ tagged.athlete?.person?.name_short || tagged.athlete?.person?.name || 'Unknown' }}
+              <!-- Edit Form (when editing) -->
+              <div v-if="editingMediaId === media.id" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Tagged Athletes</label>
+                  
+                  <!-- Search athletes -->
+                  <input
+                    v-model="editAthleteSearch"
+                    type="text"
+                    placeholder="Search athletes..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500"
+                  />
+
+                  <!-- Athlete list -->
+                  <div class="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                    <div
+                      v-for="athlete in editFilteredAthletes"
+                      :key="athlete.id"
+                      @click="toggleEditAthleteSelection(athlete.id)"
+                      :class="[
+                        'flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100',
+                        editSelectedAthletes.includes(athlete.id) ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                      ]"
+                    >
+                      <div class="flex items-center gap-3">
+                        <img
+                          :src="athlete.image_url"
+                          :alt="athlete.name"
+                          class="w-8 h-8 rounded-full object-cover"
+                          @error="$event.target.src = athlete.image_placeholder"
+                        />
+                        <span>{{ athlete.name }}</span>
+                      </div>
+                      <svg v-if="editSelectedAthletes.includes(athlete.id)" class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
                   </div>
+                  
+                  <p class="text-sm text-gray-500 mt-2">{{ editSelectedAthletes.length }} athlete(s) selected</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-2">
+                  <button
+                    @click="saveEditMedia(media)"
+                    :disabled="savingEdit"
+                    class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {{ savingEdit ? 'Saving...' : 'Save' }}
+                  </button>
+                  <button
+                    @click="cancelEditMedia"
+                    :disabled="savingEdit"
+                    class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div v-else class="text-gray-400 text-sm italic">
-                No athletes tagged
+
+              <!-- Tagged Athletes (when not editing) -->
+              <div v-else>
+                <div v-if="media.tagged_athletes && media.tagged_athletes.length > 0">
+                  <p class="text-sm font-semibold text-gray-800 mb-2">Tagged Athletes</p>
+                  <div class="space-y-2">
+                    <div
+                      v-for="tagged in media.tagged_athletes"
+                      :key="tagged.athlete_id"
+                      class="flex items-center gap-3 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-800"
+                    >
+                      <img
+                        :src="tagged.image_url"
+                        :alt="tagged.name"
+                        class="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        @error="$event.target.src = tagged.image_placeholder"
+                      />
+                      <span>{{ tagged.name }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-gray-400 text-sm italic">
+                  No athletes tagged
+                </div>
               </div>
             </div>
           </div>
@@ -294,6 +412,13 @@ const selectedAthletes = ref([])
 const athletes = ref([])
 const mediaList = ref([])
 const athleteResults = ref([])
+
+// Edit mode state
+const editingMediaId = ref(null)
+const editDescription = ref('')
+const editSelectedAthletes = ref([])
+const editAthleteSearch = ref('')
+const savingEdit = ref(false)
 
 // Smooth scrolling for filter tabs
 const filterTabsRef = ref(null)
@@ -363,20 +488,39 @@ async function loadAthletes() {
       .from('athlete')
       .select(`
         *,
-        person:person_id(name, name_short)
+        person:person_id(name, name_short, sex)
       `)
       .in('id', athleteIds)
 
     if (athletesError) throw athletesError
 
     // Map athletes with their places and sort
-    const athletesWithPlace = athletesData.map(a => ({
-      ...a,
-      name: a.person?.name_short || a.person?.name || 'Unknown',
-      name_long: a.person?.name || a.person?.name_short || 'Unknown',
-      nickname: a.nickname || null,
-      place: athletePlaceMap[a.id] || 999 // Default to 999 if no place
-    }))
+    const athletesWithPlace = athletesData.map(a => {
+      const nameLong = a.person?.name || a.person?.name_short || 'Unknown'
+      const nameShort = a.person?.name_short || a.person?.name || 'Unknown'
+      
+      // Build image filename from name
+      const imageFilename = nameLong.toLowerCase().replace(/[^a-z0-9]/g, '_')
+      
+      // Build image URL
+      let imageUrl = `https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/logos/persons/${imageFilename}.png`
+      
+      // Placeholder based on sex
+      const placeholder = a.person?.sex === 'female' 
+        ? 'https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/placeholder/woman.png'
+        : 'https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/placeholder/man.png'
+      
+      return {
+        ...a,
+        name: nameShort,
+        name_long: nameLong,
+        nickname: a.nickname || null,
+        place: athletePlaceMap[a.id] || 999, // Default to 999 if no place
+        sex: a.person?.sex || null,
+        image_url: imageUrl,
+        image_placeholder: placeholder
+      }
+    })
 
     // Sort by place (lower is better), then by name
     athletes.value = athletesWithPlace.sort((a, b) => {
@@ -411,7 +555,7 @@ async function loadMedia() {
           athlete_id,
           athlete!inner(
             id,
-            person:person_id(name, name_short)
+            person:person_id(name, name_short, sex)
           )
         ),
         result:result_id(id, athlete_id, division_id)
@@ -421,7 +565,27 @@ async function loadMedia() {
 
     if (error) throw error
 
-    mediaList.value = data || []
+    // Process media data and add image URLs for tagged athletes
+    mediaList.value = (data || []).map(media => {
+      if (media.tagged_athletes && media.tagged_athletes.length > 0) {
+        media.tagged_athletes = media.tagged_athletes.map(tagged => {
+          const nameLong = tagged.athlete?.person?.name || tagged.athlete?.person?.name_short || 'Unknown'
+          const imageFilename = nameLong.toLowerCase().replace(/[^a-z0-9]/g, '_')
+          const imageUrl = `https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/logos/persons/${imageFilename}.png`
+          const placeholder = tagged.athlete?.person?.sex === 'female'
+            ? 'https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/placeholder/woman.png'
+            : 'https://qesnrciwmhxfhdaojwwo.supabase.co/storage/v1/object/public/placeholder/man.png'
+          
+          return {
+            ...tagged,
+            image_url: imageUrl,
+            image_placeholder: placeholder,
+            name: tagged.athlete?.person?.name_short || tagged.athlete?.person?.name || 'Unknown'
+          }
+        })
+      }
+      return media
+    })
   } catch (err) {
     console.error('Error loading media:', err)
   } finally {
@@ -482,16 +646,32 @@ async function saveMedia() {
   try {
     saving.value = true
 
+    // Determine media entry fields based on number of selected athletes
+    let mediaEntryData = {
+      type: mediaPreview.value.type,
+      identifier: mediaPreview.value.identifier,
+      description: mediaPreview.value.description || null
+    }
+
+    if (selectedAthletes.value.length === 1) {
+      // Single athlete: use result_id only
+      const athleteId = selectedAthletes.value[0]
+      const result = athleteResults.value.find(r => r.athlete_id === athleteId)
+      
+      if (!result) {
+        throw new Error('Could not find result for selected athlete')
+      }
+      
+      mediaEntryData.result_id = result.id
+    } else {
+      // Multiple athletes: use division_id only
+      mediaEntryData.division_id = props.division.id
+    }
+
     // Create media entry
     const { data: mediaData, error: mediaError } = await $supabase
       .from('media')
-      .insert({
-        division_id: props.division.id,
-        event_id: props.event.id,
-        type: mediaPreview.value.type,
-        identifier: mediaPreview.value.identifier,
-        description: mediaPreview.value.description || null
-      })
+      .insert(mediaEntryData)
       .select()
       .single()
 
@@ -530,6 +710,15 @@ async function deleteMedia(mediaId) {
   if (!confirm('Are you sure you want to delete this media entry?')) return
 
   try {
+    // First, delete all media_tagged entries for this media
+    const { error: tagsError } = await $supabase
+      .from('media_tagged')
+      .delete()
+      .eq('media_id', mediaId)
+
+    if (tagsError) throw tagsError
+
+    // Then, delete the media entry itself
     const { error } = await $supabase
       .from('media')
       .delete()
@@ -561,10 +750,22 @@ const filteredMediaList = computed(() => {
     // Show only media with division_id (not result_id)
     filtered = mediaList.value.filter(media => !media.result_id)
   } else {
-    // Show media where result.athlete_id matches this athlete
-    filtered = mediaList.value.filter(media => 
-      media.result && media.result.athlete_id === mediaFilter.value
-    )
+    // Show media where athlete is tagged AND media has result_id
+    const athleteId = mediaFilter.value
+    filtered = mediaList.value.filter(media => {
+      // Only show media with result_id
+      if (!media.result_id) return false
+      
+      // Check if athlete is tagged in this media
+      const isTagged = media.tagged_athletes && media.tagged_athletes.some(
+        tagged => tagged.athlete_id === athleteId
+      )
+      
+      // Check if result.athlete_id matches
+      const resultMatches = media.result && media.result.athlete_id === athleteId
+      
+      return isTagged || resultMatches
+    })
   }
   
   // Sort: posts first, then reels, then others, ordered by created_at desc within each group
@@ -584,9 +785,20 @@ const filteredMediaList = computed(() => {
 })
 
 function getAthleteMediaCount(athleteId) {
-  return mediaList.value.filter(media => 
-    media.result && media.result.athlete_id === athleteId
-  ).length
+  return mediaList.value.filter(media => {
+    // Only count media with result_id
+    if (!media.result_id) return false
+    
+    // Check if athlete is tagged in this media
+    const isTagged = media.tagged_athletes && media.tagged_athletes.some(
+      tagged => tagged.athlete_id === athleteId
+    )
+    
+    // Check if result.athlete_id matches
+    const resultMatches = media.result && media.result.athlete_id === athleteId
+    
+    return isTagged || resultMatches
+  }).length
 }
 
 function getDivisionMediaCount() {
@@ -603,5 +815,95 @@ function formatDate(dateString) {
     day: 'numeric' 
   })
 }
+
+// Edit mode functions
+function startEditMedia(media) {
+  editingMediaId.value = media.id
+  editDescription.value = media.description || ''
+  
+  // Set selected athletes to currently tagged ones
+  editSelectedAthletes.value = media.tagged_athletes?.map(t => t.athlete_id) || []
+  editAthleteSearch.value = ''
+}
+
+function cancelEditMedia() {
+  editingMediaId.value = null
+  editDescription.value = ''
+  editSelectedAthletes.value = []
+  editAthleteSearch.value = ''
+}
+
+async function saveEditMedia(media) {
+  try {
+    savingEdit.value = true
+    
+    // Update media description
+    const { error: mediaError } = await $supabase
+      .from('media')
+      .update({
+        description: editDescription.value || null
+      })
+      .eq('id', media.id)
+    
+    if (mediaError) throw mediaError
+    
+    // Update tagged athletes (only if in division view)
+    if (mediaFilter.value === 'division') {
+      // Delete existing tags
+      const { error: deleteError } = await $supabase
+        .from('media_tagged')
+        .delete()
+        .eq('media_id', media.id)
+      
+      if (deleteError) throw deleteError
+      
+      // Create new tags
+      if (editSelectedAthletes.value.length > 0) {
+        const tags = editSelectedAthletes.value.map(athleteId => ({
+          media_id: media.id,
+          athlete_id: athleteId
+        }))
+        
+        const { error: tagsError } = await $supabase
+          .from('media_tagged')
+          .insert(tags)
+        
+        if (tagsError) throw tagsError
+      }
+    }
+    
+    // Exit edit mode
+    cancelEditMedia()
+    
+    // Reload media list
+    await loadMedia()
+    
+    alert('Media entry updated successfully!')
+  } catch (err) {
+    console.error('Error saving media edit:', err)
+    alert('Error saving media: ' + err.message)
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+function toggleEditAthleteSelection(athleteId) {
+  const index = editSelectedAthletes.value.indexOf(athleteId)
+  if (index === -1) {
+    editSelectedAthletes.value.push(athleteId)
+  } else {
+    editSelectedAthletes.value.splice(index, 1)
+  }
+}
+
+const editFilteredAthletes = computed(() => {
+  if (!editAthleteSearch.value) return athletes.value
+  
+  const query = editAthleteSearch.value.toLowerCase()
+  return athletes.value.filter(a =>
+    a.name.toLowerCase().includes(query) ||
+    (a.nickname && a.nickname.toLowerCase().includes(query))
+  )
+})
 </script>
 
